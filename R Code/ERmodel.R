@@ -69,7 +69,50 @@ for (lang in languages) {
   ))
 }
 
-# View the results
-print(clustering_results)
+
+############ compute p-values
+
+
+# Number of permutations
+num_permutations <- 100
+
+# Create an empty dataframe to store the p-values
+p_values_results <- data.frame(
+  Language = character(0),
+  PValue = numeric(0),
+  stringsAsFactors = FALSE
+)
+
+for (lang in languages) {
+  real_network <- data_list[[lang]]
+  real_clustering <- clustering_results[clustering_results$Language == lang,]$RealNetworkClustering
+  
+  # Compute the clustering coefficient for permuted networks
+  permuted_clusterings <- numeric(num_permutations)
+  for (i in 1:num_permutations) {
+    # Randomly rewire the edges while keeping the node degrees fixed
+    permuted_network <- rewire(real_network, keeping_degseq())
+    permuted_clustering_values <- transitivity(permuted_network, type = "local", vids = V(permuted_network)[degree(permuted_network) >= 2])
+    permuted_clusterings[i] <- mean(permuted_clustering_values, na.rm = TRUE)
+  }
+  
+  # Compute the p-value
+  p_value <- sum(permuted_clusterings >= real_clustering) / num_permutations
+  
+  # Append to p_values_results dataframe
+  p_values_results <- rbind(p_values_results, data.frame(Language = lang, PValue = p_value))
+}
+
+print(p_values_results)
+
+# Using one of the larger networks as an example
+real_network <- data_list[["English"]] # or any other large network in your data
+
+# Time a single permutation
+system.time({
+  permuted_network <- rewire(real_network, keeping_degseq())
+  permuted_clustering_values <- transitivity(permuted_network, type = "local", vids = V(permuted_network)[degree(permuted_network) >= 2])
+  mean(permuted_clustering_values, na.rm = TRUE)
+})
 
 
