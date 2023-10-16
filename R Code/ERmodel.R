@@ -11,39 +11,10 @@ languages <- c("Arabic", "Basque", "Catalan", "Chinese", "Czech",
 
 results <- results
 
-# Create an empty list to store the ER graphs
-er_graphs <- list()
-
-for (lang in languages) {
-  # Get the number of vertices and edges for the language from the results dataframe
-  num_vertices <- results[results$Language == lang,]$N
-  num_edges <- results[results$Language == lang,]$E
-  
-  # Generate an Erdős-Rényi graph with the given number of vertices and edges
-  er_graph <- sample_gnm(n = num_vertices, m = num_edges, directed = TRUE, loops = FALSE)
-  
-  # Store the ER graph in the list with the language name as the key
-  er_graphs[[lang]] <- er_graph
-}
-
-########### check for isolated nodes
-for (lang in languages) {
-  real_network <- data_list[[lang]]
-  er_graph <- er_graphs[[lang]]
-  
-  real_isolated_nodes <- sum(degree(real_network) < 2)
-  er_isolated_nodes <- sum(degree(er_graph) < 2)
-  
-  cat("For", lang, "- Real Network Isolated Nodes:", real_isolated_nodes, ", ER Graph Isolated Nodes:", er_isolated_nodes, "\n")
-}
-###########
-
-
 # Create an empty dataframe to store the mean local clustering coefficients
 clustering_results <- data.frame(
   Language = character(0),
   RealNetworkClustering = numeric(0),
-  ERGraphClustering = numeric(0),
   stringsAsFactors = FALSE
 )
 
@@ -56,25 +27,72 @@ for (lang in languages) {
   # -> essentially excluding loops and multiedges
   real_clustering <- mean(real_clustering_values, na.rm = TRUE)
   
-  # Repeat the same process for the Erdős-Rényi graph
-  er_graph <- er_graphs[[lang]]
-  er_clustering_values <- transitivity(er_graph, type = "local", vids = V(er_graph)[degree(er_graph) >= 2])
-  er_clustering <- mean(er_clustering_values, na.rm = TRUE)
+  
   
   # Append to clustering_results dataframe
   clustering_results <- rbind(clustering_results, data.frame(
     Language = lang,
-    RealNetworkClustering = real_clustering,
-    ERGraphClustering = er_clustering
+    RealNetworkClustering = real_clustering
   ))
 }
+
+compute_ERmodels <- function(results, t) {
+  list_er_graphs <- list()
+  
+  for (x in 1:nrow(results)) {
+    N = as.numeric(results$N[x])
+    E = as.numeric(results$E[x])
+    
+    graphs_for_lang <- list()
+    for (it in 1:t) {
+      graph = erdos.renyi.game(N, E, type = "gnm")
+      graphs_for_lang[[it]] <- graph
+    }
+    
+    list_er_graphs[[as.character(results$Language[x])]] <- graphs_for_lang
+  }
+  
+  return(list_er_graphs)
+}
+
+t = 1
+list_er_graphs <- compute_ERmodels(results, t)
+
+
+er_clustering_results <- list()
+
+for (lang in languages) {
+  er_graphs <- list_er_graphs[[lang]]
+  clustering_values <- numeric(t)
+  
+  for (i in 1:t) {
+    graph <- er_graphs[[i]]
+    clustering <- transitivity(graph, type = "local", vids = V(graph)[degree(graph) >= 2])
+    clustering_values[i] <- mean(clustering, na.rm = TRUE)
+  }
+  
+  er_clustering_results[[lang]] <- clustering_values
+}
+
+p_values <- numeric(length(languages))
+names(p_values) <- languages
+
+for (lang in languages) {
+  real_clustering <- clustering_results[clustering_results$Language == lang,]$RealNetworkClustering
+  er_clusterings <- er_clustering_results[[lang]]
+  p_values[lang] <- sum(er_clusterings >= real_clustering) / t
+}
+
+print(p_values)
+
+
 
 
 ############ compute p-values
 
 
 # Number of permutations
-num_permutations <- 100
+num_permutations <- 1000
 
 # Create an empty dataframe to store the p-values
 p_values_results <- data.frame(
