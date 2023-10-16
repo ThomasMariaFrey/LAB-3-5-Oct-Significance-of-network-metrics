@@ -134,9 +134,9 @@ print(p_values)
 
 
 
+#####################################
 
 ## -- analytical way of calculating the p-values for the ER graphs --
-
 
 # Function to calculate the expected clustering coefficient for an ER graph
 expected_clustering <- function(p) {
@@ -147,7 +147,6 @@ expected_clustering <- function(p) {
 variance_clustering <- function(N, p) {
   return(p * (1 - p) / N + p * (1 - 3 * p + p^2) / N^2)
 }
-
 
 # Function to calculate the Z-score
 z_score <- function(C, C_ER, variance_C_ER) {
@@ -160,8 +159,6 @@ p_value_analytical <- function(Z) {
   return(2 * (1 - pnorm(abs(Z))))
 }
 
-####################################
-## -- Analytical p-values for ER models --
 
 # Create a vector to store analytical p-values for each language.
 p_values_analytical <- numeric(length(languages))
