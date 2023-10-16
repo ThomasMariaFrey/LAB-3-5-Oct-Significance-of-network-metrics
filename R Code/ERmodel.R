@@ -36,101 +36,166 @@ for (lang in languages) {
   ))
 }
 
-compute_ERmodels <- function(results, t) {
+#### -- ER graphs --
+
+# Define a function to compute Erdös-Rényi (ER) models for the real networks.
+compute_ERmodels <- function(results, num_ergraphs) {
+  
+  # Create an empty list to store ER graphs for each language.
   list_er_graphs <- list()
   
+  # Loop over each language.
   for (x in 1:nrow(results)) {
+    
+    # Get the number of nodes and edges from the results dataframe.
     N = as.numeric(results$N[x])
     E = as.numeric(results$E[x])
     
+    # Create an empty list to store the generated ER graphs for the current language.
     graphs_for_lang <- list()
-    for (it in 1:t) {
+    
+    # Generate num_ergraphs ER graphs for the current language.
+    for (it in 1:num_ergraphs) {
+      
+      # Generate an ER graph with N nodes and E edges.
       graph = erdos.renyi.game(N, E, type = "gnm")
+      
+      # Append the generated graph to the list.
       graphs_for_lang[[it]] <- graph
     }
     
+    # Append the list of generated graphs for the current language to the main list.
     list_er_graphs[[as.character(results$Language[x])]] <- graphs_for_lang
   }
   
+  # Return the list containing ER graphs for each language.
   return(list_er_graphs)
 }
 
-t = 1
-list_er_graphs <- compute_ERmodels(results, t)
+# Number of ER models to generate for each language.
+# -> Monte Carlo procedure
+num_ergraphs = 15
+
+# Call the function to generate the ER models.
+list_er_graphs <- compute_ERmodels(results, num_ergraphs)
 
 
+
+# Create an empty list to store clustering coefficient values for the ER graphs.
 er_clustering_results <- list()
 
+# Loop over each language.
 for (lang in languages) {
+  
+  # Get the ER graphs for the current language.
   er_graphs <- list_er_graphs[[lang]]
+  
+  # Create a vector to store clustering coefficient values.
   clustering_values <- numeric(t)
   
+  # Compute clustering coefficients for each ER graph of the current language.
   for (i in 1:t) {
+    
+    # Get the current ER graph.
     graph <- er_graphs[[i]]
+    
+    # Compute the local clustering coefficient for each node in the graph.
     clustering <- transitivity(graph, type = "local", vids = V(graph)[degree(graph) >= 2])
+    
+    # Store the mean clustering coefficient value.
     clustering_values[i] <- mean(clustering, na.rm = TRUE)
   }
   
+  # Store the clustering coefficient values for the current language in the main list.
   er_clustering_results[[lang]] <- clustering_values
 }
 
+## -- p values for ER models --
+
+# Create a vector to store p-values for each language.
 p_values <- numeric(length(languages))
 names(p_values) <- languages
 
+# Loop over each language to compute the p-values.
 for (lang in languages) {
+  
+  # Get the real network's clustering coefficient for the current language.
   real_clustering <- clustering_results[clustering_results$Language == lang,]$RealNetworkClustering
+  
+  # Get the ER graphs' clustering coefficient values for the current language.
   er_clusterings <- er_clustering_results[[lang]]
-  p_values[lang] <- sum(er_clusterings >= real_clustering) / t
+  
+  # Compute the p-value for the current language.
+  p_values[lang] <- sum(er_clusterings >= real_clustering) / num_ergraphs
 }
 
+# Print the computed p-values.
 print(p_values)
 
 
 
 
-############ compute p-values
+## -- analytical way of calculating the p-values for the ER graphs --
 
 
-# Number of permutations
-num_permutations <- 1000
-
-# Create an empty dataframe to store the p-values
-p_values_results <- data.frame(
-  Language = character(0),
-  PValue = numeric(0),
-  stringsAsFactors = FALSE
-)
-
-for (lang in languages) {
-  real_network <- data_list[[lang]]
-  real_clustering <- clustering_results[clustering_results$Language == lang,]$RealNetworkClustering
-  
-  # Compute the clustering coefficient for permuted networks
-  permuted_clusterings <- numeric(num_permutations)
-  for (i in 1:num_permutations) {
-    # Randomly rewire the edges while keeping the node degrees fixed
-    permuted_network <- rewire(real_network, keeping_degseq())
-    permuted_clustering_values <- transitivity(permuted_network, type = "local", vids = V(permuted_network)[degree(permuted_network) >= 2])
-    permuted_clusterings[i] <- mean(permuted_clustering_values, na.rm = TRUE)
-  }
-  
-  # Compute the p-value
-  p_value <- sum(permuted_clusterings >= real_clustering) / num_permutations
-  
-  # Append to p_values_results dataframe
-  p_values_results <- rbind(p_values_results, data.frame(Language = lang, PValue = p_value))
+# Function to calculate the expected clustering coefficient for an ER graph
+expected_clustering <- function(p) {
+  return(p)
 }
 
-print(p_values_results)
+# Function to calculate the variance of the clustering coefficient for an ER graph
+variance_clustering <- function(N, p) {
+  return(p * (1 - p) / N + p * (1 - 3 * p + p^2) / N^2)
+}
 
-# Using one of the larger networks as an example
-real_network <- data_list[["English"]] # or any other large network in your data
 
-# Time a single permutation
-system.time({
-  permuted_network <- rewire(real_network, keeping_degseq())
-  permuted_clustering_values <- transitivity(permuted_network, type = "local", vids = V(permuted_network)[degree(permuted_network) >= 2])
-  mean(permuted_clustering_values, na.rm = TRUE)
-})
+# Function to calculate the Z-score
+z_score <- function(C, C_ER, variance_C_ER) {
+  return((C - C_ER) / sqrt(variance_C_ER))
+}
+
+# Function to calculate the p-value based on the Z-score
+# Assuming a two-tailed test
+p_value_analytical <- function(Z) {
+  return(2 * (1 - pnorm(abs(Z))))
+}
+
+####################################
+## -- Analytical p-values for ER models --
+
+# Create a vector to store analytical p-values for each language.
+p_values_analytical <- numeric(length(languages))
+names(p_values_analytical) <- languages
+
+# Loop over each language to compute the analytical p-values.
+for (lang in languages) {
+  
+  # Get the real network's clustering coefficient for the current language.
+  real_clustering <- clustering_results[clustering_results$Language == lang,]$RealNetworkClustering
+  
+  # Get the number of nodes and edges from the results dataframe for the current language.
+  N = results[results$Language == lang,]$N
+  E = results[results$Language == lang,]$E
+  
+  # Calculate the probability p for the ER graph.
+  p = E / (N * (N - 1) / 2)
+  
+  # Calculate the expected clustering coefficient for the ER graph.
+  C_ER = expected_clustering(p)
+  
+  # Calculate the variance of the clustering coefficient for the ER graph.
+  variance_C_ER = variance_clustering(N, p)
+  
+  # Calculate the Z-score.
+  Z = z_score(real_clustering, C_ER, variance_C_ER)
+  
+  # Compute the analytical p-value for the current language.
+  p_values_analytical[lang] = p_value_analytical(Z)
+}
+
+# Print the computed analytical p-values.
+print(p_values_analytical)
+
+
 
 
