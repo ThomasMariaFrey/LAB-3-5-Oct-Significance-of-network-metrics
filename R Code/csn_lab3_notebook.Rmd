@@ -1,16 +1,89 @@
-# Set directory
-setwd("~/GitHub/LAB-3-5-Oct-Significance-of-network-metrics/")
+---
+title: "CSN_Lab3"
+author: "Marius"
+output: html_document
+date: "2023-10-17"
+---
 
+
+```  {r}
 # Load required libraries
-library(igraph)
+library(xtable)
+library(data.table)
+library(igraph)  # Ensure you load the igraph library
 
-# Assuming you have already defined the 'languages' vector and 'results' dataframe
+```
+
+
+```  {r}
+
+
 # Define the list of languages
 languages <- c("Arabic", "Basque", "Catalan", "Chinese", "Czech", 
                "English", "Greek", "Hungarian", "Italian", "Turkish")
 
-results <- results
+```
 
+Check if in any language contains NA as string
+``` {r}
+# Set directory
+setwd("~/GitHub/LAB-3-5-Oct-Significance-of-network-metrics/")
+
+# Check rows with NA values for each language 
+# -> Czech and Turkish language data contains "NA" as normal string which should not be substituted or removed!
+sample_file <- "data/Turkish_syntactic_dependency_network.txt"
+sample_data <- fread(sample_file, skip = 1, header = FALSE, quote = "")
+print(sample_data[is.na(V1) | is.na(V2), ])
+
+```
+
+
+Create the table with the graph properties
+```  {r}
+# Set directory
+setwd("~/GitHub/LAB-3-5-Oct-Significance-of-network-metrics/")
+
+# Create an empty list to store the graph objects
+data_list <- list()
+
+# Create an empty dataframe to store information about different degree sequences
+results <- data.frame(Language = character(0), 
+                      N = numeric(0),
+                      E = numeric(0),
+                      MeanDegree = numeric(0),
+                      Density = numeric(0),
+                      stringsAsFactors = FALSE)
+
+for (lang in languages) {
+  file_name <- paste0("data/", lang, "_syntactic_dependency_network.txt")
+  
+  # Read the entire file into a data.table
+  edges <- fread(file_name, skip = 1, header = FALSE, quote = "", na.strings = "")
+  
+  # Create an igraph object from the edge list
+  graph_obj <- graph_from_data_frame(edges, directed = TRUE)
+  
+  # Store the graph object
+  data_list[[lang]] <- graph_obj
+  
+  # Get network metrics
+  num_vertices <- vcount(graph_obj)
+  num_edges <- ecount(graph_obj)
+  mean_degree <- 2 * num_edges / num_vertices
+  network_density <- 2 * num_edges / (num_vertices * (num_vertices - 1))
+  
+  # Append to results dataframe
+  results <- rbind(results, data.frame(Language = lang, 
+                                       N = num_vertices,
+                                       E = num_edges,
+                                       MeanDegree = mean_degree,
+                                       Density = network_density))
+}
+
+
+```
+Calculate mean local clustering coefficients
+``` {r}
 # Create an empty dataframe to store the mean local clustering coefficients
 clustering_results <- data.frame(
   Language = character(0),
@@ -35,9 +108,14 @@ for (lang in languages) {
     RealNetworkClustering = real_clustering
   ))
 }
+```
 
-#### -- ER graphs --
+-- ER graphs --
 
+Method 1: Monte Carlo
+Computation of correlation coefficients of ER graphs
+``` {r}
+# -- create ER graphs --
 # Define a function to compute Erdös-Rényi (ER) models for the real networks.
 compute_ERmodels <- function(results, num_ergraphs) {
   
@@ -80,7 +158,7 @@ num_ergraphs = 15
 list_er_graphs <- compute_ERmodels(results, num_ergraphs)
 
 
-
+# -- compute clustering coefficients --
 # Create an empty list to store clustering coefficient values for the ER graphs.
 er_clustering_results <- list()
 
@@ -109,9 +187,10 @@ for (lang in languages) {
   # Store the clustering coefficient values for the current language in the main list.
   er_clustering_results[[lang]] <- clustering_values
 }
+```
 
-## -- p values for ER models --
-
+Calculate p-values
+``` {r}
 # Create a vector to store p-values for each language.
 p_values <- numeric(length(languages))
 names(p_values) <- languages
@@ -131,14 +210,10 @@ for (lang in languages) {
 
 # Print the computed p-values.
 print(p_values)
-
-
-
-
-#####################################
-
-## -- analytical way of calculating the p-values for the ER graphs --
-
+```
+Method 2: Analytical
+Define functions
+``` {r}
 # Function to calculate the expected clustering coefficient for an ER graph
 expected_clustering <- function(p) {
   return(p)
@@ -159,8 +234,9 @@ z_score <- function(C, C_ER, variance_C_ER) {
 p_value_analytical <- function(Z) {
   return(2 * (1 - pnorm(abs(Z))))
 }
+```
 
-
+``` {r}
 # Create a vector to store analytical p-values for each language.
 p_values_analytical <- numeric(length(languages))
 names(p_values_analytical) <- languages
@@ -193,7 +269,6 @@ for (lang in languages) {
 
 # Print the computed analytical p-values.
 print(p_values_analytical)
-
-
+```
 
 
