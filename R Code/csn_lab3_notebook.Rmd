@@ -476,25 +476,6 @@ write.csv(pvalueswitchdf, file = "switchpvalues.csv", row.names = FALSE)
 Testing the of different orderings of vertices for estimating the p value of distributions 
 The relevant orderings are: Original ordering, Random ordering of vertices, Increasing order by degree, decreasing order by degree. They will be tested by speed. This will be done with the Basque language as it is the smallest one
 
-```{r}
-# Create the relevant path
-file_name <- paste0("../data/", "Basque", "_syntactic_dependency_network.txt")
-# Read in the table
-edgeData <- read.table(file_name, skip = 1, header = FALSE, stringsAsFactors = FALSE, quote = "", sep = " ", na.strings = "")
-# Create a basic graph
-graph = graph.data.frame(edgeData)
-# Remove potential multiples and loops in the graph
-graph = simplify(graph,remove.multiple = TRUE,remove.loops = TRUE)
-# Extract the real clustering coefficient value for the current language
-relevantResult <- 0.078
-# Use the switching methods to calculate the p value
-pvalue <- timeTestCalculatePValueForSwitching(graph,relevantResult)
-# Append to pvalue list
-pvalues <- c(pvalues, pvalue)
-# Safe the calculated values in a txt file
-write(pvalues, file = "pvaluesSpeedTest.txt")
-```
-
 Functions for the time tests
 ```{r}
 timeTestCalculatePValueForSwitching <- function(graph, realClusteringCoefficient){
@@ -650,4 +631,24 @@ timeTestDECENDINGestimateGraphClusteringCoefficient <- function(graph){
   return(averageClusteringCoefficient)
 }
 
+```
+
+Running the time testing
+```{r}
+# Create the relevant path
+file_name <- paste0("../data/", "Basque", "_syntactic_dependency_network.txt")
+# Read in the table
+edgeData <- read.table(file_name, skip = 1, header = FALSE, stringsAsFactors = FALSE, quote = "", sep = " ", na.strings = "")
+# Create a basic graph
+graph = graph.data.frame(edgeData)
+# Remove potential multiples and loops in the graph
+graph = simplify(graph,remove.multiple = TRUE,remove.loops = TRUE)
+# Extract the real clustering coefficient value for the current language
+relevantResult <- 0.078
+# Use the switching methods to calculate the p value
+pvalue <- timeTestCalculatePValueForSwitching(graph,relevantResult)
+# Append to pvalue list
+pvalues <- c(pvalues, pvalue)
+# Safe the calculated values in a txt file
+write(pvalues, file = "pvaluesSpeedTest.txt")
 ```
