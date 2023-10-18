@@ -27,7 +27,7 @@ languages <- c("Arabic", "Basque", "Catalan", "Chinese", "Czech",
 Check if in any language contains NA as string
 ``` {r}
 # Set directory
-setwd("~/GitHub/LAB-3-5-Oct-Significance-of-network-metrics/")
+setwd("~/Desktop/University/CSN-MIRI Complex and Social Networks/Lab/LAB-3-5-Oct-Significance-of-network-metrics")
 
 # Loop through each language to check for rows with NA values
 for (lang in languages) {
@@ -51,7 +51,7 @@ for (lang in languages) {
 Create the table with the graph properties
 ```  {r}
 # Set directory
-setwd("~/GitHub/LAB-3-5-Oct-Significance-of-network-metrics/")
+setwd("~/Desktop/University/CSN-MIRI Complex and Social Networks/Lab/LAB-3-5-Oct-Significance-of-network-metrics")
 
 # Create an empty list to store the graph objects
 data_list <- list()
@@ -104,11 +104,15 @@ clustering_results <- data.frame(
 for (lang in languages) {
   # Compute the local clustering coefficient for each node in the real network
   real_network <- data_list[[lang]]
-  real_clustering_values <- transitivity(real_network, type = "local", vids = V(real_network)[degree(real_network) >= 2])
+  # if degree(node) < 2, function returns NaN. It need to be replaced with 0
+  real_clustering_values <- transitivity(real_network, type = "local")
+  #real_clustering_values <- transitivity(real_network, type = "local", vids = V(real_network)[degree(real_network) >= 2])
   
   # Compute the mean of the local clustering coefficients, excluding nodes with a degree less than 2
   # -> essentially excluding loops and multiedges
-  real_clustering <- mean(real_clustering_values, na.rm = TRUE)
+  real_clustering_values[is.na(real_clustering_values)] <- 0
+  #real_clustering <- mean(real_clustering_values, na.rm = TRUE)
+  real_clustering <- mean(real_clustering_values, na.rm = FALSE)
   
   
   
@@ -179,10 +183,10 @@ for (lang in languages) {
   er_graphs <- list_er_graphs[[lang]]
   
   # Create a vector to store clustering coefficient values.
-  clustering_values <- numeric(t)
+  clustering_values <- numeric(num_ergraphs)
   
   # Compute clustering coefficients for each ER graph of the current language.
-  for (i in 1:t) {
+  for (i in 1:num_ergraphs) {
     
     # Get the current ER graph.
     graph <- er_graphs[[i]]
