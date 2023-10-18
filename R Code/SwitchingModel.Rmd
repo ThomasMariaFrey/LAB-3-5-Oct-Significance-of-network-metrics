@@ -1,0 +1,200 @@
+1. Create the switching model for every language. Do this at least 10 times 
+to account for randomness.
+2. Calculate the clustering coefficent for every switching model and every
+iteration
+3. Calculate the p value in accordance to the real clustering coefficient
+
+TODO: Make sure this cant happen:
+Those networks may contain loops (a loop is an edge connecting a node with itself). Remove them before performing any analysis of the network properties.
+
+
+Set the working directory, load the requested libraries and obtain the source 
+code.
+```{r}
+#Change to your working directoy
+setwd("~/Desktop/University/CSN-MIRI Complex and Social Networks/Lab/LAB-3-5-Oct-Significance-of-network-metrics")
+
+# Load required libraries
+library(xtable)
+library(data.table)
+library(igraph)
+```
+
+Set the basic required variables
+```{r}
+#languages <- c("Arabic", "Basque", "Catalan", "Chinese", "Czech", 
+#               "English", "Greek", "Hungarian", "Italian", "Turkish")
+languages <- c("Arabic", "Hungarian","Chinese", "Catalan", "English",  "Czech") #Basque", #"Italian","Turkish","Greek",
+
+# The number of switching models that are to be created and estimated. 
+nSwitch <- 1001 #TODO:Increase this atleast to 20
+#The size of the switch graphs that are estimated.
+Estimationpercentage <- 0.02
+clusteringResults <- read.csv("../clustering_results.csv")
+#realClusteringCoefficientValues <- clusteringResults$RealNetworkClustering
+#Lightlanguagesfirst
+realClusteringCoefficientValues <- c(0.078,0.1695,0.2885,0.1766,0.2387,0.0654,0.2495,0.2984,0.3310,0.1741)#1001 until 5
+
+```
+
+P Value Calculation Function: This function uses the Monte Carlos simulation 
+function that is used to compare the clustering coefficent of the switch model
+graphs to the clustering coefficent of the original graphs. This is done by 
+calculating the proportion of randomized graphs that have a clustering 
+coefficent greater or equal thatn the original model.
+```{r}
+CalculatePValueForSwitching <- function(graph, realClusteringCoefficient){
+  # Compute the number of nodes in the graph
+  numNodesTotal <- vcount(graph)
+  # Initializing the largerclust to 0
+  largerClust <- 0
+  # Create a switching model multiple times for a given time and calculate the 
+  # relevant 
+  for (i in seq(1,nSwitch)){
+    print("Iteration")
+    print(i)
+    switchClusteringCoefficient <- createSwitchingGraph(graph)
+    print("SwitchclusteringCoefficient:")
+    print(switchClusteringCoefficient)
+    print("RealclusteringCoefficient:")
+    print(realClusteringCoefficient)
+    if (switchClusteringCoefficient >= realClusteringCoefficient){
+      largerClust = largerClust + 1
+    } 
+  }
+  return(largerClust)
+  #return(largerClust / nSwitch) TODO Consider which value to use here
+}
+```
+
+Estimate Graph Clustering Coefficient Function: We estimate the clustering coefficent
+for a subset of nodes and the average this value to obtain an estimate of the 
+overall closeness metric.
+```{r}
+estimateGraphClusteringCoefficient <- function(graph){
+    nodesAmount <- vcount(graph)
+    clustering_coefficient = 0
+    sampleSize = nodesAmount * Estimationpercentage # Estimate based on a subset of nodessample[i], here 0.02
+    sample = sample(1:nodesAmount, nodesAmount, replace = FALSE)
+    
+    for (i in seq(1:sampleSize)) {
+        node_degree = degree(graph)[i]
+        if(node_degree>= 2){
+          local_cc = transitivity(graph, type = "local", vids = i)
+        }else{
+          local_cc <- 0
+        }
+        
+        if (is.na(local_cc)) {
+            local_cc = 0
+        }
+        clustering_coefficient <- clustering_coefficient + local_cc
+    }
+    
+    # Average the clustering coefficients
+    clustering_coefficient = clustering_coefficient / sampleSize
+    
+    return(clustering_coefficient)
+}
+```
+
+Switching model Function: This function will modify the structure of original 
+synthetic dependency networks by "switching" to create a new graph that
+preserves the degree distribution of the orignal graph but is otherwise 
+randomized. This is done by calculating valid edge switches. Valid means
+that it does not create loops or multiple edges. There after the switches are
+applied. We then calculate the clustering coefficent by wattz and strogatz.
+```{r}
+createSwitchingGraph <-function(graph){
+    edgeData = as_edgelist(graph, names = FALSE)
+    E = nrow(edgeData)
+    Q = 10 #TODO do coupon calculation here, should be the given value though
+    adjMatrix = as_adjacency_matrix(graph, names = FALSE, type = "both")
+    matrixStyle = as.matrix(adjMatrix)
+    
+    firstEdgeIndices = sample(1:E, Q * E, replace = TRUE)
+    secondEdgeIndices = sample(1:E, Q * E, replace = TRUE)
+    
+    successTries = 0
+    rejectedTries = 0
+    
+    for (idx in seq(1, E * Q)) {
+        firstEdge = edgeData[firstEdgeIndices[idx], ]
+        secondEdge = edgeData[secondEdgeIndices[idx], ]
+        
+        origFirstEdge = firstEdge
+        origSecondEdge = secondEdge
+        
+        if (all(firstEdge != secondEdge) && 
+            matrixStyle[secondEdge[1], firstEdge[2]] == 0 &&
+            matrixStyle[firstEdge[2], secondEdge[1]] == 0 &&
+            matrixStyle[firstEdge[1], secondEdge[2]] == 0 &&
+            matrixStyle[secondEdge[2], firstEdge[1]] == 0) {
+            
+            swapped = firstEdge[2]
+            firstEdge[2] = secondEdge[2]
+            secondEdge[2] = swapped
+            
+            edgeData[firstEdgeIndices[idx], ] = firstEdge
+            edgeData[secondEdgeIndices[idx], ] = secondEdge
+            
+            matrixStyle[origFirstEdge[1], origFirstEdge[2]] = 0
+            matrixStyle[origSecondEdge[1], origSecondEdge[2]] = 0
+            matrixStyle[origFirstEdge[2], origFirstEdge[1]] = 0
+            matrixStyle[origSecondEdge[2], origSecondEdge[1]] = 0
+            
+            matrixStyle[firstEdge[1], firstEdge[2]] = 1
+            matrixStyle[secondEdge[1], secondEdge[2]] = 1
+            matrixStyle[firstEdge[2], firstEdge[1]] = 1
+            matrixStyle[secondEdge[2], secondEdge[1]] = 1
+            
+            successTries = successTries + 1
+        } else {
+            rejectedTries = rejectedTries + 1
+        }
+    }
+    cat("Rejected Attempts: ", rejectedTries, "\n")
+    cat("Successful Switches: ", successTries, "\n")
+    randomizedSwitchGraph<-graph_from_edgelist(edgeData, directed = FALSE)
+    estClusteringCoefficient <- estimateGraphClusteringCoefficient(randomizedSwitchGraph)
+    return(estClusteringCoefficient)
+}
+```
+
+Running the switching model
+```{r}
+i <- 5
+pvalues <- c()
+print("Amount of iterations: ")
+print(nSwitch)
+for (lang in languages) {
+  file_name <- paste0("../data/", lang, "_syntactic_dependency_network.txt")
+  
+  # Read the entire file into a data.table
+  edges <- read.table(file_name, skip = 1, header = FALSE, stringsAsFactors = FALSE, quote = "", sep = " ", na.strings = "")
+  edges = na.omit(edges)
+        
+  graph = graph.data.frame(edges[-1,])
+  graph = simplify(graph,remove.multiple = TRUE,remove.loops = TRUE)
+  
+  print("PValue for ")
+  print(lang)
+  print(" equals ")
+  relevantResult <- realClusteringCoefficientValues[i]
+  pvalue <- CalculatePValueForSwitching(graph,relevantResult)
+  print(pvalue)
+  pvalues <- c(pvalues, pvalue)
+  write(pvalues, file = "pvalues2.txt")
+  i <- i+1
+}
+pvalueswitchdf <- data.frame(Column1 = languages, Column2 = pvalues)
+write.csv(pvalueswitchdf, file = "switchpvalues.csv", row.names = FALSE)
+
+```
+
+
+
+
+
+
+
