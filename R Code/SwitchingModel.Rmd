@@ -22,15 +22,18 @@ library(igraph)
 
 Set the basic required variables
 ```{r}
-languages <- c("Arabic", "Basque", "Catalan", "Chinese", "Czech", 
-               "English", "Greek", "Hungarian", "Italian", "Turkish")
+#languages <- c("Arabic", "Basque", "Catalan", "Chinese", "Czech", 
+#               "English", "Greek", "Hungarian", "Italian", "Turkish")
+languages <- c("Arabic", "Hungarian","Chinese", "Catalan", "English",  "Czech") #Basque", #"Italian","Turkish","Greek",
 
 # The number of switching models that are to be created and estimated. 
-nSwitch <- 1 #TODO:Increase this atleast to 20
+nSwitch <- 1001 #TODO:Increase this atleast to 20
 #The size of the switch graphs that are estimated.
-Estimationpercentage <- 0.1
+Estimationpercentage <- 0.02
 clusteringResults <- read.csv("../clustering_results.csv")
-realClusteringCoefficientValues <- clusteringResults$RealNetworkClustering
+#realClusteringCoefficientValues <- clusteringResults$RealNetworkClustering
+#Lightlanguagesfirst
+realClusteringCoefficientValues <- c(0.078,0.1695,0.2885,0.1766,0.2387,0.0654,0.2495,0.2984,0.3310,0.1741)#1001 until 5
 
 ```
 
@@ -48,6 +51,8 @@ CalculatePValueForSwitching <- function(graph, realClusteringCoefficient){
   # Create a switching model multiple times for a given time and calculate the 
   # relevant 
   for (i in seq(1,nSwitch)){
+    print("Iteration")
+    print(i)
     switchClusteringCoefficient <- createSwitchingGraph(graph)
     print("SwitchclusteringCoefficient:")
     print(switchClusteringCoefficient)
@@ -57,7 +62,8 @@ CalculatePValueForSwitching <- function(graph, realClusteringCoefficient){
       largerClust = largerClust + 1
     } 
   }
-  return(largerClust / nSwitch)
+  return(largerClust)
+  #return(largerClust / nSwitch) TODO Consider which value to use here
 }
 ```
 
@@ -66,82 +72,30 @@ for a subset of nodes and the average this value to obtain an estimate of the
 overall closeness metric.
 ```{r}
 estimateGraphClusteringCoefficient <- function(graph){
-  if(FALSE){
-    # Remove self-loops
-    graph <- delete_edges(graph, E(graph)[from(V(graph)) == to(V(graph))])
-    # Compute the number of nodes in the graph
-    numNodesTotal <- vcount(graph)
-    # Calculate the number of nodes that will be used for the estimation
-    numNodesEstimation <- ceiling(numNodesTotal * Estimationpercentage)
-    #clusteringCoeff <- 0
-    # Create a sample of the given graphs nodes
-    sampleNodes <- sample(1:numNodesTotal, numNodesTotal, replace = FALSE)
-    # Calculate the clustering coefficient for the sample of nodes, TODO:
-    # Check that this really ensures that there are no loops present in the
-    # graph
+    nodesAmount <- vcount(graph)
+    clustering_coefficient = 0
+    sampleSize = nodesAmount * Estimationpercentage # Estimate based on a subset of nodessample[i], here 0.02
+    sample = sample(1:nodesAmount, nodesAmount, replace = FALSE)
     
-    # Compute the local clustering coefficient for each node in the graph.
-    clustering <- transitivity(graph, type = "local", vids = sampleNodes)
+    for (i in seq(1:sampleSize)) {
+        node_degree = degree(graph)[i]
+        if(node_degree>= 2){
+          local_cc = transitivity(graph, type = "local", vids = i)
+        }else{
+          local_cc <- 0
+        }
+        
+        if (is.na(local_cc)) {
+            local_cc = 0
+        }
+        clustering_coefficient <- clustering_coefficient + local_cc
+    }
     
-    print(clustering)
-      
-    # Remove NAN values
-    clustering <- clustering[!is.na(clustering)]
+    # Average the clustering coefficients
+    clustering_coefficient = clustering_coefficient / sampleSize
     
-    # Store the mean clustering coefficient value.
-    clusteringCoeff <- mean(clustering, na.rm = TRUE)
-    
-    return(clusteringCoeff)
-  }
-  # Remove self-loops
-  graph <- delete_edges(graph, E(graph)[from(V(graph)) == to(V(graph))])
-  
-  # Nodes eligible for clustering coefficient calculation (degree >= 2)
-  eligibleNodes <- V(graph)[degree(graph) >= 2]
-  
-  # If there aren't enough eligible nodes, return a message
-  if (length(eligibleNodes) == 0) {
-    return("Not enough nodes with degree >= 2 for meaningful clustering coefficient calculation.")
-  }
-  
-  # Compute the number of nodes for the estimation
-  numNodesEstimation <- min(ceiling(length(eligibleNodes) * Estimationpercentage), length(eligibleNodes))
-  
-  # Sample the eligible nodes
-  sampleNodes <- sample(eligibleNodes, numNodesEstimation, replace = FALSE)
-  
-  # Compute the local clustering coefficient for the sampled nodes in the graph.
-  clustering <- transitivity(graph, type = "local", vids = sampleNodes)
-  
-  # Return the mean clustering coefficient value for the sampled nodes.
-  return(mean(clustering, na.rm = TRUE))
-  }
-  #Approach 1: Always returns 0.
-  #for (i in seq(1:numNodesEstimation)){
-    
-    
-    # Get neighbors of the current node
-    #neighbors <- neighbors(graph, v = sampleNodes[i])
-    #k = length(neighbors)
-    # If fewer than 2 neighbors, clustering coefficient is 0
-    #if (k < 2) {
-    #  next
-    #}
-    # Calculate the number of links between neighbors
-    #e = 0
-    #for (j in 1:(k-1)) {
-    #  for (l in (j+1):k) {
-    #    if (are_adjacent(graph, neighbors[j], neighbors[l])) {
-    #      e = e + 1
-    #    }
-    #  }
-    #}
-    # Clustering coefficient for the current node
-    #curr_coeff = (2 * e) / (k * (k - 1))
-    # Add to the accumulator
-    #clusteringCoeff = clusteringCoeff + curr_coeff
-  #}
-  # Calculate Average clustering coefficient
+    return(clustering_coefficient)
+}
 ```
 
 Switching model Function: This function will modify the structure of original 
@@ -152,8 +106,6 @@ that it does not create loops or multiple edges. There after the switches are
 applied. We then calculate the clustering coefficent by wattz and strogatz.
 ```{r}
 createSwitchingGraph <-function(graph){
-    successTries = 0
-    rejectedTries = 0
     edgeData = as_edgelist(graph, names = FALSE)
     E = nrow(edgeData)
     Q = 10 #TODO do coupon calculation here, should be the given value though
@@ -204,7 +156,6 @@ createSwitchingGraph <-function(graph){
     cat("Rejected Attempts: ", rejectedTries, "\n")
     cat("Successful Switches: ", successTries, "\n")
     randomizedSwitchGraph<-graph_from_edgelist(edgeData, directed = FALSE)
-    print(randomizedSwitchGraph)
     estClusteringCoefficient <- estimateGraphClusteringCoefficient(randomizedSwitchGraph)
     return(estClusteringCoefficient)
 }
@@ -212,7 +163,7 @@ createSwitchingGraph <-function(graph){
 
 Running the switching model
 ```{r}
-i <- 1
+i <- 5
 pvalues <- c()
 print("Amount of iterations: ")
 print(nSwitch)
@@ -226,9 +177,6 @@ for (lang in languages) {
   graph = graph.data.frame(edges[-1,])
   graph = simplify(graph,remove.multiple = TRUE,remove.loops = TRUE)
   
-  # Create an igraph object from the edge list
-  #graph_obj <- graph_from_data_frame(edges, directed = TRUE)
-  
   print("PValue for ")
   print(lang)
   print(" equals ")
@@ -236,10 +184,11 @@ for (lang in languages) {
   pvalue <- CalculatePValueForSwitching(graph,relevantResult)
   print(pvalue)
   pvalues <- c(pvalues, pvalue)
+  write(pvalues, file = "pvalues2.txt")
   i <- i+1
 }
 pvalueswitchdf <- data.frame(Column1 = languages, Column2 = pvalues)
-write.csv(pvalueswitchdf, file = "switchpvalues", row.names = FALSE)
+write.csv(pvalueswitchdf, file = "switchpvalues.csv", row.names = FALSE)
 
 ```
 
