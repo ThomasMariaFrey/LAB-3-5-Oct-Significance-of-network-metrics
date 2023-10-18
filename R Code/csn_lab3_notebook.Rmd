@@ -29,11 +29,21 @@ Check if in any language contains NA as string
 # Set directory
 setwd("~/GitHub/LAB-3-5-Oct-Significance-of-network-metrics/")
 
-# Check rows with NA values for each language 
-# -> Czech and Turkish language data contains "NA" as normal string which should not be substituted or removed!
-sample_file <- "data/Turkish_syntactic_dependency_network.txt"
-sample_data <- fread(sample_file, skip = 1, header = FALSE, quote = "")
-print(sample_data[is.na(V1) | is.na(V2), ])
+# Loop through each language to check for rows with NA values
+for (lang in languages) {
+  file_name <- paste0("data/", lang, "_syntactic_dependency_network.txt")
+  
+  # Read the data
+  data <- fread(file_name, skip = 1, header = FALSE, quote = "")
+  
+  # Print rows with NA values
+  if (nrow(data[is.na(V1) | is.na(V2), ]) > 0) {
+    cat("Rows with NA values for", lang, ":\n")
+    print(data[is.na(V1) | is.na(V2), ])
+  } else {
+    cat("No rows with NA values found for", lang, "\n")
+  }
+}
 
 ```
 
@@ -58,7 +68,7 @@ for (lang in languages) {
   file_name <- paste0("data/", lang, "_syntactic_dependency_network.txt")
   
   # Read the entire file into a data.table
-  edges <- fread(file_name, skip = 1, header = FALSE, quote = "", na.strings = "")
+  edges <- fread(file_name, skip = 1, header = FALSE, quote = "")
   
   # Create an igraph object from the edge list
   graph_obj <- graph_from_data_frame(edges, directed = TRUE)
