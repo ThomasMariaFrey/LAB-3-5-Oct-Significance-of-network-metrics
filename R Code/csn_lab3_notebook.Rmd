@@ -383,19 +383,20 @@ createSwitchingGraph <-function(graph){
         # Make sure that all edges are different and there are no redundant 
         # edges present so that a successfull switch can be made
         if (all(firstEdge != secondEdge) && adjacendcyMatrix[secondEdge[1], firstEdge[2]] == 0 && adjacendcyMatrix[firstEdge[2], secondEdge[1]] == 0 && adjacendcyMatrix[firstEdge[2], secondEdge[1]] == 0 && adjacendcyMatrix[firstEdge[1], secondEdge[2]] == 0 && adjacendcyMatrix[secondEdge[2], firstEdge[1]] == 0) {
-            
-            #Switch the first and second edge
-            swapped = firstEdge[2]
-            firstEdge[2] = secondEdge[2]
-            secondEdge[2] = swapped
-            edgeData[firstEdgeIndices[idx],] = firstEdge
-            edgeData[secondEdgeIndices[idx],] = secondEdge
+          
             
             #Delete the old adjacencies
             adjacendcyMatrix[origFirstEdge[1], origFirstEdge[2]] = 0
             adjacendcyMatrix[origFirstEdge[2], origFirstEdge[1]] = 0
             adjacendcyMatrix[origSecondEdge[1], origSecondEdge[2]] = 0
             adjacendcyMatrix[origSecondEdge[2], origSecondEdge[1]] = 0
+
+            #Switch the first and second edge
+            swapped = firstEdge[2]
+            firstEdge[2] = secondEdge[2]
+            secondEdge[2] = swapped
+            edgeData[firstEdgeIndices[idx],] = firstEdge
+            edgeData[secondEdgeIndices[idx],] = secondEdge
             
             #Create the new adjacencies
             adjacendcyMatrix[firstEdge[1], firstEdge[2]] = 1
