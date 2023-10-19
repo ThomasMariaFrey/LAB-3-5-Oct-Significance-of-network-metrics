@@ -305,7 +305,7 @@ languages <- c("Arabic", "Basque", "Catalan", "Chinese",
 # should be at least 20
 nSwitch <- 10
 # The size of the switch graphs that are estimated.
-Estimationpercentage <- 0.1
+Estimationpercentage <- 0.05
 clusteringResults <- read.csv("clustering_results.csv")
 realClusteringCoefficientValues <- clusteringResults$RealNetworkClustering
 # Removing the value for chzech
